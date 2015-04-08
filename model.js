@@ -1,6 +1,6 @@
 function RoomModel() {
 	var path = require('path');
-	this.rootDir = path.resolve(__dirname + '/../data');
+	this.rootDir = path.resolve(__dirname + '/data');
 	
 	this.fs = require('fs');
 }
