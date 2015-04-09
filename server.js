@@ -16,19 +16,43 @@
 //}).listen(process.env.PORT, process.env.IP);
 //var io = require('socket.io')(server);
 
-var io = require('socket.io')(process.env.PORT);
+console.log('starting server.js');
 
 var roomModel = require(__dirname + '/model.js').createRoomModel();
+var io = require('socket.io')(process.env.PORT);
 
 io.sockets.on('connection', function(socket) {
     socket.on('start', function(data) {
+        console.log('new client connected');
         socket.join(data.room);
-        var initData = roomModel.load(data.room, 0);
-        socket.emit('load', initData);
+        var loadLoop = function(version) {
+            roomModel.load(data.room, version, function(initData) {
+                if (!socket.connected) {
+                    return;
+                }
+                socket.emit('load', initData);
+                console.log(data.room + ': ' + initData.version + '/' + initData.lastVersion);
+                if (initData.version != initData.lastVersion) {
+                    var v = initData.version;
+                    initData = null;
+                    global.gc();
+                    process.nextTick(function() { loadLoop(v); });
+                    return;
+                }
+                initData = null;
+                global.gc();
+                console.log('load done');
+            });
+        }
+        loadLoop(0);
     });
-    socket.on('add lines', function(data) {
+    socket.on('submit', function(data) {
 		var version = roomModel.save(data.room, data.data);
 		data.data.version = version;
+		data.data.lastVersion = version;
+		socket.emit('submitSuccess');
 		io.to(data.room).emit('load', data.data);
+		data = null;
+		global.gc();
 	});
 });
