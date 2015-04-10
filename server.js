@@ -25,26 +25,22 @@ io.sockets.on('connection', function(socket) {
     socket.on('start', function(data) {
         console.log('new client connected');
         socket.join(data.room);
+        socket.emit('start');
+    });
+    socket.on('load', function(data) {
         var loadLoop = function(version) {
             roomModel.load(data.room, version, function(initData) {
                 if (!socket.connected) {
                     return;
                 }
                 socket.emit('load', initData);
-                console.log(data.room + ': ' + initData.version + '/' + initData.lastVersion);
-                if (initData.version != initData.lastVersion) {
-                    var v = initData.version;
-                    initData = null;
-                    global.gc();
-                    process.nextTick(function() { loadLoop(v); });
-                    return;
-                }
+                if (initData.version == initData.lastVersion)
+                    console.log('load done');
                 initData = null;
                 global.gc();
-                console.log('load done');
             });
         }
-        loadLoop(0);
+        loadLoop(data.version);
     });
     socket.on('submit', function(data) {
 		var version = roomModel.save(data.room, data.data);

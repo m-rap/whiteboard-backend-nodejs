@@ -210,7 +210,9 @@ RoomModel.prototype.load = function(roomName, version, callback) {
 	
 	var nextVer = function() {
 		i++;
-		if (i == currentVersion || i % 50 == 0) {
+		if (i % 100 == 0)
+			console.log(roomName + ': ' + i + '/' + currentVersion);
+		if (i >= currentVersion || i % 3 == 0) {
 			data.version = i;
 			callback(data);
 			data = null;
