@@ -22,22 +22,29 @@ var roomModel = require(__dirname + '/model.js').createRoomModel();
 var io = require('socket.io')(process.env.PORT);
 
 io.sockets.on('connection', function(socket) {
+    var lastLoadVer = null;
     socket.on('start', function(data) {
         console.log('new client connected');
         socket.join(data.room);
         socket.emit('start');
     });
     socket.on('load', function(data) {
+        if (data.version == lastLoadVer)
+            return;
+        
+        lastLoadVer = data.version;
+        
         var loadLoop = function(version) {
             roomModel.load(data.room, version, function(initData) {
                 if (!socket.connected) {
                     return;
                 }
                 socket.emit('load', initData);
+                console.log(data.room + ': ' + initData.lineCount + ', ' + initData.version + '/' + initData.lastVersion);
                 if (initData.version == initData.lastVersion)
                     console.log('load done');
-                initData = null;
-                global.gc();
+                //initData = null;
+                //global.gc();
             });
         }
         loadLoop(data.version);
@@ -48,7 +55,7 @@ io.sockets.on('connection', function(socket) {
 		data.data.lastVersion = version;
 		socket.emit('submitSuccess');
 		io.to(data.room).emit('load', data.data);
-		data = null;
-		global.gc();
+		//data = null;
+		//global.gc();
 	});
 });

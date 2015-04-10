@@ -78,27 +78,30 @@ RoomModel.prototype.load = function(roomName, version, callback) {
 		this.create(roomName);
 	}
 	
-	if (currentVersion == version)
-		return false;
-	
 	var clientVersion = parseInt(version);
 	var data = {
 		sheets: new Array(),
 		version: clientVersion,
-		isLast: false,
+		lastVersion: currentVersion,
+		lineCount: 0,
 	};
+	
+	if (currentVersion == clientVersion) {
+		callback(data);
+		return;
+	}
 	
 	var path = this.rootDir + '/' + roomName;
 	
 	var i = clientVersion + 1;
-	data.lastVersion = currentVersion;
 	
-	
-	var realParseVer = function(temp) {
+	var realParseVer = function(temp, callback) {
 		//console.log('ver ' + i);
 		
-		if (i == currentVersion)
-			nextVer();
+		if (i > currentVersion) {
+			callback();
+			return;
+		}
 		
 		for (var j in temp) {
 			var tempEl = temp[j];
@@ -113,6 +116,7 @@ RoomModel.prototype.load = function(roomName, version, callback) {
 						sheetExists = true;
 						for (var l in tempEl.lines) {
 							data.sheets[k].lines.push(tempEl.lines[l]);
+							data.lineCount++;
 						}
 					}
 				}
@@ -122,39 +126,41 @@ RoomModel.prototype.load = function(roomName, version, callback) {
 			if (!sheetExists) {
 				if (tempEl.lines instanceof Array) {
 					data.sheets.push(tempEl);
+					data.lineCount += tempEl.lines.length;
 				}
 			}
 		}
 		
-		nextVer();
+		callback();
 	}
 	
-	var parseVer = function() {
-		parseVer1();
-		//parseVer2();
-		//parseVer3();
+	var parseVer = function(callback) {
+		parseVer1(callback);
+		//parseVer2(callback);
+		//parseVer3(callback);
 	}
 	
-	var parseVer1 = function() {
+	var parseVer1 = function(callback) {
 		var fs = require("fs");
 		fs.readFile(path + '/' + i, 'utf8', function(err, fileStr) {
 			if (err != null) {
 				console.log(err);
-				nextVer();
+				callback();
 				return;
 			}
 			
 			var temp = JSON.parse(fileStr);
 			
 			if (typeof(temp.sheets) == 'undefined') {
-				nextVer();
+				callback();
+				return;
 			}
 			
-			realParseVer(temp.sheets);
+			realParseVer(temp.sheets, callback);
 		});
 	}
 	
-	var parseVer2 = function() {
+	var parseVer2 = function(callback) {
 		var fs = require("fs");
 		var JSONStream = require('JSONStream');
 		var es = require("event-stream");
@@ -168,15 +174,15 @@ RoomModel.prototype.load = function(roomName, version, callback) {
 			stream.pipe(parser).on('error', function(e) {
 				console.log('problem parsing ' + path + '/' + i + ': ' + e);
 			}).pipe(es.mapSync(function(temp) {
-				realParseVer(temp);
+				realParseVer(temp, callback);
 			})).on('error', function(e) {
 				console.log('problem parsing ' + path + '/' + i + ': ' + e);
-				nextVer();
+				callback();
 			});
 		});
 	}
 	
-	var parseVer3 = function() {
+	var parseVer3 = function(callback) {
 		var fs = require("fs");
 		var stream = fs.createReadStream(path + '/' + i, {encoding: 'utf8'});
 		var buf = '';
@@ -188,10 +194,11 @@ RoomModel.prototype.load = function(roomName, version, callback) {
 		    var temp = JSON.parse(buf);
 			
 			if (typeof(temp.sheets) == 'undefined') {
-				nextVer();
+				callback();
+				return;
 			}
 			
-			realParseVer(temp.sheets);
+			realParseVer(temp.sheets, callback);
 		});
 		
 		var pump = function() {
@@ -208,21 +215,21 @@ RoomModel.prototype.load = function(roomName, version, callback) {
 		}
 	}
 	
-	var nextVer = function() {
-		i++;
-		if (i % 100 == 0)
-			console.log(roomName + ': ' + i + '/' + currentVersion);
-		if (i >= currentVersion || i % 3 == 0) {
-			data.version = i;
-			callback(data);
-			data = null;
-			global.gc();
-			return;
-		}
-		parseVer();
+	var loopParse = function() {
+		parseVer(function() {
+			if (data.lineCount >= 2048 || i >= currentVersion) {
+				data.version = i;
+				callback(data);
+				//data = null;
+				//global.gc();
+				return;
+			}
+			i++;
+			loopParse();
+		});
 	}
 	
-	parseVer();
+	loopParse();
 }
 
 module.exports.createRoomModel = function() {
