@@ -16,16 +16,37 @@
 //}).listen(process.env.PORT, process.env.IP);
 //var io = require('socket.io')(server);
 
+console.logCopy = console.log.bind(console);
+
+console.log = function()
+{
+    if (arguments.length)
+    {
+        var args = Array.prototype.slice.call(arguments, 0);
+        var timestamp = '[' + new Date().toUTCString() + '] ';
+        args.unshift(timestamp);
+        this.logCopy.apply(this, args);
+    }
+};
+
 console.log('starting server.js');
 
 var roomModel = require(__dirname + '/model.js').createRoomModel();
 var io = require('socket.io')(process.env.PORT);
 
 io.sockets.on('connection', function(socket) {
+    console.log('new client ' + socket.id + ', ip: ' + socket.request.connection.remoteAddress);
     var lastLoadVer = null;
+    var room = null;
+    
+    socket.on('disconnect', function() {
+        console.log('client ' + socket.id + ' has been disconnected');
+    });
+    
     socket.on('start', function(data) {
-        console.log('new client connected');
         socket.join(data.room);
+        room = data.room;
+        console.log('client ' + socket.id + ' has joined to ' + room + ' room');
         socket.emit('start');
     });
     socket.on('load', function(data) {
@@ -40,7 +61,7 @@ io.sockets.on('connection', function(socket) {
                     return;
                 }
                 socket.emit('load', initData);
-                console.log(data.room + ': ' + initData.lineCount + ', ' + initData.version + '/' + initData.lastVersion);
+                //console.log(data.room + ': ' + initData.lineCount + ', ' + initData.version + '/' + initData.lastVersion);
                 if (initData.version == initData.lastVersion)
                     console.log('load done');
                 //initData = null;
