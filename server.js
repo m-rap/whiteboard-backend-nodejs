@@ -64,12 +64,13 @@ io.sockets.on('connection', function(socket) {
         }
         var clientInfo = null;
         if (emptySlot) {
+            id = i;
             clients[i] = {id: i, color: colors[curColor], room: data.room};
-            clientInfo = clients[i];
         } else {
+            id = clients.length;
             clients.push({id: clients.length, color: colors[curColor], room: data.room});
-            clientInfo = clients[clients.length - 1];
         }
+        clientInfo = clients[id];
         curColor = (curColor + 1) % colors.length;
         
         socket.join(data.room);
@@ -77,6 +78,8 @@ io.sockets.on('connection', function(socket) {
         console.log('client ' + socket.id + ' has joined to ' + room + ' room');
         var clientsInRoom = new Array();
         for (i in clients) {
+            if (clients[i] == null)
+                continue;
             if (i != clientInfo.id && clients[i].room == room) {
                 clientsInRoom.push(clients[i]);
             }
